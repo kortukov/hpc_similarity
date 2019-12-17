@@ -23,6 +23,7 @@ class Structure:
     def __init__(self, parameters, t_series):
         self.parameters = parameters
         self.t_series = t_series
+        self.error = None
 
     @classmethod
     def fit(cls, time_series):
@@ -31,7 +32,9 @@ class Structure:
             time_series (pandas.DataFrame): must have 2 columns 't' and 'y'.
         """
         parameters = cls._compute_parameters(time_series)
-        return cls(parameters, time_series['t'])
+        fitted_structure = cls(parameters, time_series['t'])
+        fitted_structure.calculate_error(time_series)
+        return fitted_structure
 
     @classmethod
     def _compute_parameters(cls, time_series):
@@ -40,9 +43,15 @@ class Structure:
     def get_y_series(self):
         raise NotImplementedError
 
+    def calculate_error(self, time_series):
+        self.error = sum((self.get_y_series() - time_series['y'])**2)
+
     def get_df(self):
         y_series = self.get_y_series()
         return pd.DataFrame({'t': self.t_series, 'y': y_series})
+
+    def get_feature_vector(self):
+        raise NotImplementedError
 
 
 class ConstantStructure(Structure):
@@ -53,7 +62,12 @@ class ConstantStructure(Structure):
         return ConstantParameters(time_series['y'].mean())
 
     def get_y_series(self):
-        return pd.Series([self.parameters.a] * self.t_series.size)
+        return  pd.Series([self.parameters.a] * self.t_series.size)
+
+    def get_feature_vector(self):
+        feature_vector = [0.0] * 15
+        feature_vector[0] = self.parameters.a
+        return np.array(feature_vector)
 
 
 class StraightStructure(Structure):
@@ -72,6 +86,12 @@ class StraightStructure(Structure):
     def get_y_series(self):
         return self.t_series * self.parameters.b + self.parameters.a
 
+    def get_feature_vector(self):
+        feature_vector = [0.0] * 15
+        feature_vector[1] = self.parameters.a
+        feature_vector[2] = self.parameters.b
+        return np.array(feature_vector)
+
 
 class ExponentialStructure(Structure):
     """ f(t) = a * |b|**t + c"""
@@ -89,11 +109,17 @@ class ExponentialStructure(Structure):
 
         x0 = np.array([0, 0, 0])
         res = minimize(minimized_function, x0, method='Nelder-Mead')
-        print(res)
         return ExponentialParameters(*res.x)
 
     def get_y_series(self):
         return self.parameters.a * abs(self.parameters.b) ** self.t_series + self.parameters.c
+
+    def get_feature_vector(self):
+        feature_vector = [0.0] * 15
+        feature_vector[3] = self.parameters.a
+        feature_vector[4] = self.parameters.b
+        feature_vector[5] = self.parameters.c
+        return np.array(feature_vector)
 
 
 class SinusoidalStructure(Structure):
@@ -112,11 +138,17 @@ class SinusoidalStructure(Structure):
 
         x0 = np.array([0, 0, 0])
         res = minimize(minimized_function, x0, method='Nelder-Mead')
-        print(res)
         return SinusoidalParameters(*res.x)
 
     def get_y_series(self):
         return self.parameters.a * np.sin(self.t_series + self.parameters.b) + self.parameters.c
+
+    def get_feature_vector(self):
+        feature_vector = [0.0] * 15
+        feature_vector[6] = self.parameters.a
+        feature_vector[7] = self.parameters.b
+        feature_vector[8] = self.parameters.c
+        return np.array(feature_vector)
 
 
 class TriangularStructure(Structure):
@@ -138,7 +170,6 @@ class TriangularStructure(Structure):
 
         x0 = np.array([0, 0, 0])
         res = minimize(minimized_function, x0, method='Nelder-Mead')
-        print(res)
         return TriangularParameters(*res.x)
 
     def get_y_series(self):
@@ -149,6 +180,13 @@ class TriangularStructure(Structure):
             (self.parameters.a + 2 * self.parameters.b * self.parameters.c)
             - (self.parameters.b * self.t_series[self.t_series >= self.parameters.c])
         )
+
+    def get_feature_vector(self):
+        feature_vector = [0.0] * 15
+        feature_vector[9] = self.parameters.a
+        feature_vector[10] = self.parameters.b
+        feature_vector[11] = self.parameters.c
+        return np.array(feature_vector)
 
 
 class TrapezoidalStructure(Structure):
@@ -171,7 +209,6 @@ class TrapezoidalStructure(Structure):
 
         x0 = np.array([0, 0, 0])
         res = minimize(minimized_function, x0, method='Nelder-Mead')
-        print(res)
         return TrapezoidalParameters(*res.x)
 
     def get_y_series(self):
@@ -192,3 +229,19 @@ class TrapezoidalStructure(Structure):
                 - self.t_series[self.t_series >= c_stop] * self.parameters.b
             )
         )
+
+    def get_feature_vector(self):
+        feature_vector = [0.0] * 15
+        feature_vector[12] = self.parameters.a
+        feature_vector[13] = self.parameters.b
+        feature_vector[14] = self.parameters.c
+        return np.array(feature_vector)
+
+AllStructures = (
+    ConstantStructure,
+    StraightStructure,
+    ExponentialStructure,
+    SinusoidalStructure,
+    TriangularStructure,
+    TrapezoidalStructure,
+)
