@@ -44,7 +44,7 @@ class Structure:
         raise NotImplementedError
 
     def calculate_error(self, time_series):
-        self.error = sum((self.get_y_series() - time_series['y'])**2)
+        self.error = sum((self.get_y_series() - time_series['y']) ** 2)
 
     def get_df(self):
         y_series = self.get_y_series()
@@ -53,6 +53,12 @@ class Structure:
     def get_feature_vector(self):
         raise NotImplementedError
 
+    @property
+    def symbol(self):
+        raise NotImplementedError
+
+    def __repr__(self):
+        return str(type(self))
 
 class ConstantStructure(Structure):
     """ f(t) = a"""
@@ -62,12 +68,16 @@ class ConstantStructure(Structure):
         return ConstantParameters(time_series['y'].mean())
 
     def get_y_series(self):
-        return  pd.Series([self.parameters.a] * self.t_series.size)
+        return pd.Series([self.parameters.a] * self.t_series.size)
 
     def get_feature_vector(self):
         feature_vector = [0.0] * 15
         feature_vector[0] = self.parameters.a
         return np.array(feature_vector)
+
+    @property
+    def symbol(self):
+        return 'a'
 
 
 class StraightStructure(Structure):
@@ -91,6 +101,15 @@ class StraightStructure(Structure):
         feature_vector[1] = self.parameters.a
         feature_vector[2] = self.parameters.b
         return np.array(feature_vector)
+
+    @property
+    def symbol(self):
+        if self.parameters.b < 0:
+            return 'b'
+        elif self.parameters.b > 0:
+            return 'c'
+        else:
+            return 'a'
 
 
 class ExponentialStructure(Structure):
@@ -121,6 +140,13 @@ class ExponentialStructure(Structure):
         feature_vector[5] = self.parameters.c
         return np.array(feature_vector)
 
+    @property
+    def symbol(self):
+        if -1 < self.parameters.b < 1:
+            return 'd'
+        else:
+            return 'e'
+
 
 class SinusoidalStructure(Structure):
     """ f(t) = a * sin(t + b) + c"""
@@ -149,6 +175,10 @@ class SinusoidalStructure(Structure):
         feature_vector[7] = self.parameters.b
         feature_vector[8] = self.parameters.c
         return np.array(feature_vector)
+
+    @property
+    def symbol(self):
+        return 'f'
 
 
 class TriangularStructure(Structure):
@@ -187,6 +217,13 @@ class TriangularStructure(Structure):
         feature_vector[10] = self.parameters.b
         feature_vector[11] = self.parameters.c
         return np.array(feature_vector)
+
+    @property
+    def symbol(self):
+        if self.parameters.b < 0:
+            return 'g'
+        else:
+            return 'h'
 
 
 class TrapezoidalStructure(Structure):
@@ -236,6 +273,14 @@ class TrapezoidalStructure(Structure):
         feature_vector[13] = self.parameters.b
         feature_vector[14] = self.parameters.c
         return np.array(feature_vector)
+
+    @property
+    def symbol(self):
+        if self.parameters.b < 0:
+            return 'i'
+        else:
+            return 'j'
+
 
 AllStructures = (
     ConstantStructure,
