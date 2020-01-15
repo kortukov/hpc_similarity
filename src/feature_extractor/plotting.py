@@ -23,3 +23,4 @@ def plot_superstructure(superstructure):
     fig = superstructure.structures[0].get_df().plot(x='t', y='y')
     for subregion in superstructure.structures[1:]:
         subregion.get_df().plot(ax=fig, x='t', y='y')
+        return fig
