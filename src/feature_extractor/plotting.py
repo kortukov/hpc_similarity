@@ -12,6 +12,31 @@ def scatter_time_series_list(time_series_list):
     return fig
 
 
+def plot_time_series_dict_together(time_series_dict):
+    fig = None
+    for sensor_name, time_series in time_series_dict.items():
+        if fig is None:
+            fig = time_series.plot(x='t', y='y', label=sensor_name)
+        else:
+            time_series.plot(ax=fig, x='t', y='y', label=sensor_name)
+    return fig
+
+
+# These are most useful
+
+
+def plot_time_series_dict_subplots(time_series_dict):
+    for sensor_name, time_series in time_series_dict.items():
+        time_series.plot(x='t', y='y', label=sensor_name)
+
+
+def plot_time_series_with_change_points(time_series_dict, change_points_times):
+    for sensor_name, time_series in time_series_dict.items():
+        fig = time_series.plot(x='t', y='y', label=sensor_name)
+        for cpt in change_points_times:
+            fig.axvline(cpt)
+
+
 def plot_change_points_on_figure(change_points_times, figure):
     new_figure = figure
     for cpt in change_points_times:

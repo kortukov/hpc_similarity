@@ -10,7 +10,9 @@ def read_job_data_by_sensor(job_files_by_sensor):
     """For each sensor in dict converts value from list of filenames to list of pandas Dataframes"""
     job_data_by_sensor = {}
     for sensor_name, sensor_files in job_files_by_sensor.items():
-        job_data_by_sensor[sensor_name] = [pd.read_csv(filepath) for filepath in sensor_files]
+        job_data_by_sensor[sensor_name] = [
+            pd.read_csv(filepath, dtype=float) for filepath in sensor_files
+        ]
     return job_data_by_sensor
 
 
@@ -19,11 +21,11 @@ def validate_job_data_by_sensor(job_data_by_sensor):
     for sensor_name, sensor_dataframes in job_data_by_sensor.items():
         shapes = [df.shape for df in sensor_dataframes]
         if not all(shape == shapes[0] for shape in shapes):
-            print(
+            '''print(
                 'Not all node data for sensor "{}" have same shape, shapes {}. '
                 'Please, reload job from db.'.format(sensor_name, shapes)
-            )
-            exit(1)
+            )'''
+            # exit(1)
 
 
 def average_job_data_by_node(job_data_by_sensor):
@@ -32,6 +34,7 @@ def average_job_data_by_node(job_data_by_sensor):
         concatenated_dataframes = pd.concat(sensor_dataframes)
         by_row_index = concatenated_dataframes.groupby(concatenated_dataframes.index)
         averaged_job_data[sensor_name] = by_row_index.mean()
+        averaged_job_data[sensor_name].name = sensor_name
     return averaged_job_data
 
 
