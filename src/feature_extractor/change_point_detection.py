@@ -35,14 +35,13 @@ def detect_change_points(time_series_dict, time_delta):
 
 def postfilter(X, change_points):
     if len(change_points) > 0:
-        change_points = detect_local_lines(X, change_points, np.pi / 75, 5)
+        change_points = detect_local_lines(X, change_points, np.pi / 90, 5)
         # change_points = split_30(X, change_points)
     return change_points
 
 
-# выделение окрестностей
 def detect_local_lines(Z, change_points, threshold_angle, radius):
-    X = Z * 5
+    X = Z * 3
     n = len(X)
     char_n = len(X[0])
     new_ch_points = []
@@ -76,12 +75,14 @@ def detect_local_lines(Z, change_points, threshold_angle, radius):
 
                     weights = np.zeros((point + 1 - l))
                     weights[-1] = 1
-                    weights[:-1] = 0.1
+                    weights[:-1] = 0.01
 
                     coef = np.polynomial.polynomial.polyfit(
                         range(l, point + 1), X[l : point + 1, j], 1, w=weights
                     )
                     coef_l[j] = coef[1]
+
+                    del weights
                 if point < n - 3:
                     r = point + 5
                     if r >= n:
@@ -89,12 +90,13 @@ def detect_local_lines(Z, change_points, threshold_angle, radius):
 
                     weights = np.zeros((r + 1 - point))
                     weights[0] = 1
-                    weights[1:] = 0.1
+                    weights[1:] = 0.01
 
                     coef = np.polynomial.polynomial.polyfit(
                         range(point, r + 1), X[point : r + 1, j], 1, w=weights
                     )
                     coef_r[j] = coef[1]
+                    del weights
             coef_l = np.arctan(coef_l)
             coef_r = np.arctan(coef_r)
             for j in range(char_n):
@@ -108,7 +110,6 @@ def detect_local_lines(Z, change_points, threshold_angle, radius):
         zipped = sorted(zipped, reverse=True)
         # print(zipped)
         l_angle = 0
-        # print(zipped[0])
         if zipped[0][0] > threshold_angle:
             left_point = zipped[0][1]
             l_angle = zipped[0][0]
@@ -151,8 +152,6 @@ def detect_local_lines(Z, change_points, threshold_angle, radius):
         zipped = sorted(zipped, reverse=True)
         # print(zipped)
         r_angle = 0
-        # print(zipped[0])
-        # print("")
         if zipped[0][0] > threshold_angle:
             right_point = zipped[0][1]
             r_angle = zipped[0][0]
@@ -167,14 +166,11 @@ def detect_local_lines(Z, change_points, threshold_angle, radius):
             if right_point not in new_ch_points:
                 new_ch_points.append(right_point)
                 res_angles.append(r_angle)
-    # print(new_ch_points)
     zipped = zip(new_ch_points, res_angles)
     zipped = sorted(zipped)
     new_ch_points = [x[0] for x in zipped]
     res_angles = [x[1] for x in zipped]
-    new_ch_points = remove_close(new_ch_points, res_angles)
-
-    # print(new_ch_points)
+    # new_ch_points = remove_close(new_ch_points, res_angles)
     return new_ch_points
 
 
@@ -189,17 +185,13 @@ def remove_close(change_points, angles):
         found = False
         new_ch_points = []
         cur = 0
-        if len(change_points) == 1:
-            new_ch_points = change_points
-            break
         for i in range(1, len(change_points) - 1):
             if change_points[i] == change_points[cur]:
-                # print(str(i) + " " + str(cur))
+                print(str(i) + " " + str(cur))
                 found = True
                 continue
             if change_points[i] - change_points[cur] <= 2:
                 found = True
-                # print("cur:{}, i={}".format(change_points[cur], change_points[i]))
                 if angles[i] > angles[cur]:
                     new_ch_points.append(change_points[i])
                     cur = i
@@ -208,12 +200,6 @@ def remove_close(change_points, angles):
             else:
                 new_ch_points.append(change_points[cur])
                 cur = i
-        if (
-            len(new_ch_points) > 0
-            and len(change_points) > 0
-            and new_ch_points[-1] != change_points[cur]
-        ):
-            new_ch_points.append(change_points[cur])
         new_ch_points.append(old_one[-1])
         new_ch_points = np.unique(new_ch_points)
         if not found:
@@ -234,6 +220,9 @@ def remove_close(change_points, angles):
 
     new_ch_points = np.unique(np.append(new_ch_points, old_one[-1]))
     return new_ch_points
+
+
+# def detect_local_DTW(X, change_points):
 
 
 def split_30(X, change_points):

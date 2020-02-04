@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import scipy.signal
 
 
@@ -24,16 +25,17 @@ def find_timestamp_intersection(dataframes_dict):
     for sensor_name in dataframes_dict:
         df = dataframes_dict[sensor_name]
         dataframes_dict[sensor_name] = df[df.time.isin(intersecting_times)]
+        # dataframes_dict[sensor_name] = dataframes_dict[sensor_name].drop_duplicates('time')
 
     return dataframes_dict
 
 
 def get_time_delta(dataframes_dict):
     first_df = next(iter(dataframes_dict.values()))
-    if len(first_df.time) < 2:
-        raise ValueError('Length of dataframe time is less than 2')
+    if len(first_df.time) < 3:
+        raise ValueError('Length of dataframe time is less than 3')
 
-    return int((first_df.time[1] - first_df.time[0]) / 60)
+    return int((first_df.time[2] - first_df.time[1]) / 60)
 
 
 def preprocess_raw_sensor_data(raw_sensor_dataframes_dict, left_bound=None, right_bound=None):
@@ -67,5 +69,64 @@ def preprocess_raw_sensor_data(raw_sensor_dataframes_dict, left_bound=None, righ
         sensor_time_series = median_filtration(sensor_time_series)
         sensor_time_series.name = sensor_name
         sensor_time_series.index = np.arange(1, len(sensor_time_series) + 1)
+        short_y, short_t, times, _ = reduceSizeOfData(sensor_time_series.y, sensor_time_series.t)
+        sensor_time_series.y, sensor_time_series.t = short_y, short_t
+        time_delta *= times
         time_series_dict[sensor_name] = sensor_time_series
     return time_series_dict, time_delta
+
+
+def reduceSizeOfData(data_series, timestamps_series):
+    data = list(data_series)
+    timestamps = list(timestamps_series)
+    times = 1
+
+    if len(timestamps) <= 600:
+        return (data_series, timestamps_series, times, range(len(timestamps)))
+
+    indices = range(len(timestamps))
+    cur_len = len(timestamps)
+    tmp_data = []
+    tmp_timestamps = []
+    while cur_len > 600:
+        # print(cur_len)
+        tmp_indices = []
+        for item in data:
+            tmp_data.append([])
+        i = 1
+        while i < len(timestamps):
+            if timestamps[i] - timestamps[i - 1] > 600:
+                for j in range(len(data)):
+                    tmp_data[j].append(data[j][i - 1])
+                tmp_timestamps.append(timestamps[i - 1])
+                tmp_indices.append(indices[i - 1])
+                i += 1
+                last_written = i - 2
+                continue
+
+            for j in range(len(data)):
+                tmp_data[j].append((data[j][i - 1] + data[j][i]) / 2)
+            tmp_timestamps.append(timestamps[i])
+            tmp_indices.append(indices[i])
+            last_written = i
+            i += 2
+        if last_written != len(timestamps) - 1:
+            i = len(timestamps) - 1
+            for j in range(len(data)):
+                tmp_data[j].append(data[j][i])
+            tmp_timestamps.append(timestamps[i])
+            tmp_indices.append(indices[i])
+        times *= 2
+
+        data = tmp_data
+        timestamps = tmp_timestamps
+        tmp_data = []
+        tmp_timestamps = []
+        if cur_len == len(timestamps):
+            break
+        cur_len = len(timestamps)
+        indices = tmp_indices
+
+    data_series = pd.Series(data)
+    timestamps_series = pd.Series(timestamps)
+    return data_series, timestamps_series, times, indices

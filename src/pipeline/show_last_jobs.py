@@ -15,14 +15,14 @@ def main(length=('l', 0, 'Length of job in minutes')):
     needed_fields = ('job_id', 't_start', 't_end')
     if not length:
         query = 'SELECT {}, {}, {} FROM job WHERE t_end < {} ORDER BY t_end DESC LIMIT 10'.format(
-            *needed_fields, int(datetime.datetime.now().timestamp())
+            *needed_fields, int(datetime.datetime.now().timestamp() - 60 * 24 * 3600)
         )
     else:
         query = (
             'SELECT {}, {}, {} FROM job WHERE t_end < {} AND t_end - t_start >= {} '
             'AND t_end - t_start <= {} ORDER BY t_end DESC LIMIT 10'.format(
                 *needed_fields,
-                int(datetime.datetime.now().timestamp()),
+                int(datetime.datetime.now().timestamp()) - 60 * 24 * 3600,
                 length * 60 - 600,
                 length * 60 + 600,
             )
