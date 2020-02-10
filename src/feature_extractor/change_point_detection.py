@@ -29,6 +29,9 @@ def detect_change_points(time_series_dict, time_delta):
     change_points = np.append(change_points, [1, len(multivariate_ts)])
     change_points = np.unique(change_points)
 
+    if change_points[0] == 0:
+        change_points = change_points[1:]
+
     change_points_times = [list(time_series_dict.values())[0].t[ind] for ind in change_points]
     return list(change_points), change_points_times
 

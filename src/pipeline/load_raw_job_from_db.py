@@ -1,7 +1,8 @@
 from opster import command
-from pathlib import Path
 import psycopg2
 import psycopg2.extras
+import pickle
+import pandas as pd
 
 import config.config as config
 
@@ -21,24 +22,37 @@ def parse_nodes_string(nodes_string):
     return nodelist
 
 
-def download_job_data(cursor, job_id, nodes_list, t_start, t_end, sensor_tables=config.SENSORS_LIST):
-    raw_job_data_dir_path = '../../data/raw_data/job{}'.format(job_id)
-    Path(raw_job_data_dir_path).mkdir(parents=True, exist_ok=True)
+def download_job_data(
+    cursor, job_id, nodes_list, t_start, t_end, sensor_tables=config.SENSORS_LIST
+):
+    averaged_job_data = {}
     for sensor in sensor_tables:
-        for node in nodes_list:
-            csv_relative_path = '/{}{}.csv'.format(sensor, node)
-            csv_absolute_path = '{}{}'.format(raw_job_data_dir_path, csv_relative_path)
-            print(csv_absolute_path)
-            query = (
-                'SELECT time, avg '
-                'FROM {sensor} '
-                'WHERE node_id = {node} AND time >= {t_start} AND time <= {t_end}'.format(
-                    sensor=sensor, node=node, t_start=t_start, t_end=t_end
-                )
+        print('Downloading {} for job {}'.format(sensor, job_id))
+        node_query_part = ",".join([str(x) for x in nodes_list])
+        query = (
+            'SELECT time, avg(avg) '
+            'FROM {sensor} '
+            'WHERE node_id in ({nodes}) AND time >= {t_start} AND time <= {t_end} group by time order by time '.format(
+                sensor=sensor, nodes=node_query_part, t_start=t_start, t_end=t_end
             )
-            outputquery = "COPY ({}) TO STDOUT WITH CSV HEADER".format(query)
-            with open(csv_absolute_path, 'w+') as f:
-                cursor.copy_expert(outputquery, f)
+        )
+        # outputquery = "COPY ({}) TO STDOUT WITH CSV HEADER".format(query)
+        # with open(csv_absolute_path, 'w+') as f:
+        #     cursor.copy_expert(outputquery, f)
+        cursor.execute(query)
+        data = cursor.fetchall()
+
+        if not data:
+            exit('Failed to fetch data')
+        if len(data) > 1:
+            data = data[1:]
+
+        sensor_data = {'time': [x['time'] for x in data], 'avg': [x['avg'] for x in data]}
+        averaged_job_data[sensor] = pd.DataFrame(data=sensor_data)
+
+    node_average_data_file_path = '../../data/labeled_node_average_data/job{}.pickle'.format(job_id)
+    with open(node_average_data_file_path, 'wb+') as pickle_file:
+        pickle.dump(averaged_job_data, pickle_file)
 
 
 @command()
