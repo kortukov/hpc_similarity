@@ -40,7 +40,7 @@ def sequential_extract_superstructure(preprocessed_job_data, change_points):
 @command()
 def main(job_id, string_only=('s', False, 'Save only string dict')):
     """ This script does the following:
-            1. Load job_data dict from pickle  (data/node_average/job<job_id>.pickle)
+            1. Load job_data dict from pickle  (data/labeled_node_average_data/job<job_id>.pickle)
             2. Preprocess data
             3. Detect change points
             4. Extract structural features
@@ -48,7 +48,7 @@ def main(job_id, string_only=('s', False, 'Save only string dict')):
             """
     final_job_dict = {}
 
-    node_average_data_file_path = '../../data/node_average_data/job{}.pickle'.format(job_id)
+    node_average_data_file_path = '../../data/labeled_node_average_data/job{}.pickle'.format(job_id)
     with open(node_average_data_file_path, 'rb') as pickle_file:
         averaged_job_data = pickle.load(pickle_file)
     for sensor in averaged_job_data:

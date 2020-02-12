@@ -35,6 +35,7 @@ def plot_time_series_with_change_points(time_series_dict, change_points_times):
         fig = time_series.plot(x='t', y='y', label=sensor_name)
         for cpt in change_points_times:
             fig.axvline(cpt)
+    return fig
 
 
 def plot_change_points_on_figure(change_points_times, figure):
@@ -49,3 +50,10 @@ def plot_superstructure(superstructure):
     for subregion in superstructure.structures[1:]:
         subregion.get_df().plot(ax=fig, x='t', y='y')
         return fig
+
+
+def plot_superstructure_on_fig(superstructure, fig):
+    superstructure.structures[0].get_df().plot(ax=fig, x='t', y='y')
+    for subregion in superstructure.structures[1:]:
+        subregion.get_df().plot(ax=fig, x='t', y='y')
+    return fig

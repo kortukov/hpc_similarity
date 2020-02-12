@@ -60,6 +60,7 @@ class Structure:
     def __repr__(self):
         return str(type(self))
 
+
 class ConstantStructure(Structure):
     """ f(t) = a"""
 
@@ -89,7 +90,7 @@ class StraightStructure(Structure):
         y_series = time_series['y']
         t_mean = t_series.mean()
         y_mean = y_series.mean()
-        b = sum((t_series - t_mean) * (y_series - y_mean)) / sum((t_series - t_mean) ** 2)
+        b = sum((t_series - t_mean) * (y_series - y_mean)) / (sum((t_series - t_mean) ** 2) or 1)
         a = y_mean - b * t_mean
         return StraightParameters(a, b)
 
