@@ -2,7 +2,7 @@
 A tool to find similar supercomputer applications using system monitoring time-series data and structural pattern recognition.
 
 
-####Workflow
+#### Workflow
 1. Use R ecp package to divide sensor time-series into intervals.
 https://cran.r-project.org/web/packages/ecp/index.html
 2. Extract structural features from each subinterval. Idea from Generalized Feature Extraction 
@@ -13,7 +13,7 @@ https://www.cs.cmu.edu/~bobski/pubs/tr01108-twosided.pdf
 5. Train a classifier to discriminate between similar and not similar pairs of jobs.
 
 
-####Code structure
+#### Code structure
 `src/pipeline` - *Workflow scripts*:
 * `load_raw_job_from_db.py` - Load sensor data from database.
 * `extract_features.py` - Preprocess data, find intervals with ecp, extract structural features.
@@ -37,7 +37,7 @@ Scripts use a config file:
 * `plotting.py` - Useful plotting functions.
 
 
-####Data structure
+#### Data structure
 
 `data/labeled_node_average_data` - Job data downloaded from db. For every job - one pickle file 'job{job_id}.pickle'
 
