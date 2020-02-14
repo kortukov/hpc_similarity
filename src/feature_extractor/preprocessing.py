@@ -60,10 +60,13 @@ def preprocess_raw_sensor_data(raw_sensor_dataframes_dict, left_bound=None, righ
         Dict of same length pandas dataframes with 'time' and 'avg' fields and
         name attribute.
     Preprocessing:
+        Finding time delta
         Finding timestamp intersection
-        Choosing and renaming columns.
+        Checking if all lengths are same.
+        Reducing size if needed.
+        Renaming.
         Dividing 'y' values by max.
-        Median filtering with kernel size 5.
+        Median filtering.
         Changing index to be from 1 to len(dataframe)
     Output:
         Dict of preprocessed pandas dfs with 't' and 'y' fields and
