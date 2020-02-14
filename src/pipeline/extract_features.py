@@ -7,7 +7,6 @@ import time
 
 sys.path.append('../')
 import feature_extractor.preprocessing as preprocessing
-import feature_extractor.plotting as plotting
 import feature_extractor.change_point_detection as cpd
 import feature_extractor.feature_extraction as extraction
 

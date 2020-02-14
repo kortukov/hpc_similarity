@@ -50,30 +50,6 @@ def get_partitioning(time_series, change_points=None):
     return [(change_points[i], change_points[i + 1]) for i in range(len(change_points) - 1)]
 
 
-def get_uniform_partitioning(time_series, number_of_subregions):
-    """
-    Function
-    :param time_series: pandas dataframe with columns 't' and 'y'
-    :param number_of_subregions: int
-    :return:
-        list of 2-tuples - [(x1,x2), (x3,x4), ... ] partitioning of the time
-        series into subregions
-    """
-    length = time_series['t'].count()
-    if length < number_of_subregions * 2:
-        raise ValueError('Too small time_series')
-
-    delta = length // number_of_subregions
-    left = 0
-    partitioning = []
-    while left < length:
-        right = min(left + delta + 1, length)
-        partitioning.append((left, right))
-        left = right
-
-    return partitioning
-
-
 def superstructure_to_feature_vector(superstructure):
     feature_vector = np.array([])
     for structure in superstructure.structures:
