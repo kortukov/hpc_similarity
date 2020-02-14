@@ -14,7 +14,7 @@ https://www.cs.cmu.edu/~bobski/pubs/tr01108-twosided.pdf
 
 
 #### Code structure
-`src/pipeline` - *Workflow scripts*:
+`src/pipeline` - **Workflow scripts**:
 * `load_raw_job_from_db.py` - Load sensor data from database.
 * `extract_features.py` - Preprocess data, find intervals with ecp, extract structural features.
 * `classify.py` - Using encoded jobs and labeled data, calculate string distances, classify jobs and measure accuracy.
@@ -29,7 +29,7 @@ Scripts use a config file:
 * `config/hpc_similarity.conf` - JSON config file.
 
 
-`src/feature_extractor` - *Feature extraction library*:
+`src/feature_extractor` - **Feature extraction library**:
 * `preprocessing.py` - All preprocessing done to sensor time series.
 * `structures.py` - Classes for all structural primitives.
 * `feature_extraction.py` - Extraction of optimal structural features.
