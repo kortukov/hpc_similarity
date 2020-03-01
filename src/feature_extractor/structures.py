@@ -1,7 +1,7 @@
 from collections import namedtuple
 import pandas as pd
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, curve_fit
 
 ConstantParameters = namedtuple('ConstantParameters', 'a')
 StraightParameters = namedtuple('StraightParameters', 'a b')
@@ -9,6 +9,8 @@ ExponentialParameters = namedtuple('ExponentialParameters', 'a b c')
 SinusoidalParameters = namedtuple('SinusoidalParameters', 'a b c')
 TriangularParameters = namedtuple('TriangularParameters', 'a b c')
 TrapezoidalParameters = namedtuple('TrapezoidalParameters', 'a b c')
+
+DISPLAY_SEARCH = True
 
 
 class Structure:
@@ -44,7 +46,7 @@ class Structure:
         raise NotImplementedError
 
     def calculate_error(self, time_series):
-        self.error = sum((self.get_y_series() - time_series['y']) ** 2)
+        self.error = sum((self.y_series - time_series['y']) ** 2)
 
     def get_df(self):
         y_series = self.get_y_series()
@@ -52,6 +54,10 @@ class Structure:
 
     def get_feature_vector(self):
         raise NotImplementedError
+
+    @property
+    def y_series(self):
+        return self.get_y_series()
 
     @property
     def symbol(self):
@@ -69,7 +75,9 @@ class ConstantStructure(Structure):
         return ConstantParameters(time_series['y'].mean())
 
     def get_y_series(self):
-        return pd.Series([self.parameters.a] * self.t_series.size)
+        y_series = pd.Series([self.parameters.a] * self.t_series.size)
+        y_series.index = self.t_series.index
+        return y_series
 
     def get_feature_vector(self):
         feature_vector = [0.0] * 15
@@ -121,18 +129,20 @@ class ExponentialStructure(Structure):
         t_series = time_series['t']
         y_series = time_series['y']
 
-        def minimized_function(params):
-            parameters = ExponentialParameters(*params)
-            structure = ExponentialStructure(parameters, t_series)
-            struct_y_series = structure.get_y_series()
-            return sum((y_series - struct_y_series) ** 2)
+        params, cov = curve_fit(
+            cls.exponential, t_series, y_series, p0=(1, 2, y_series.mean()), maxfev=2000
+        )
+        return ExponentialParameters(*params)
 
-        x0 = np.array([0, 0, 0])
-        res = minimize(minimized_function, x0, method='Nelder-Mead')
-        return ExponentialParameters(*res.x)
+    @staticmethod
+    def exponential(t_series, a, b, c):
+        t_series = (t_series - t_series.mean()) / t_series.std()
+        return a * abs(b) ** t_series + c
 
     def get_y_series(self):
-        return self.parameters.a * abs(self.parameters.b) ** self.t_series + self.parameters.c
+        return self.exponential(
+            self.t_series, self.parameters.a, self.parameters.b, self.parameters.c
+        )
 
     def get_feature_vector(self):
         feature_vector = [0.0] * 15
@@ -164,7 +174,9 @@ class SinusoidalStructure(Structure):
             return sum((y_series - struct_y_series) ** 2)
 
         x0 = np.array([0, 0, 0])
-        res = minimize(minimized_function, x0, method='Nelder-Mead')
+        res = minimize(
+            minimized_function, x0, method='Nelder-Mead', options={'disp': DISPLAY_SEARCH}
+        )
         return SinusoidalParameters(*res.x)
 
     def get_y_series(self):
@@ -193,23 +205,25 @@ class TriangularStructure(Structure):
         t_series = time_series['t']
         y_series = time_series['y']
 
-        def minimized_function(params):
-            parameters = TriangularParameters(*params)
-            structure = TriangularStructure(parameters, t_series)
-            struct_y_series = structure.get_y_series()
-            return sum((y_series - struct_y_series) ** 2)
+        params, cov = curve_fit(
+            cls.triangular,
+            t_series,
+            y_series,
+            p0=(y_series.mean(), y_series.mean() / (t_series.mean() or 1), t_series.mean()),
+            bounds=([-np.inf, -np.inf, t_series.min()], [np.inf, np.inf, t_series.max()]),
+        )
+        return TriangularParameters(*params)
 
-        x0 = np.array([0, 0, 0])
-        res = minimize(minimized_function, x0, method='Nelder-Mead')
-        return TriangularParameters(*res.x)
+    @staticmethod
+    def triangular(t_series, a, b, c):
+        return (a + t_series[t_series < c] * b).append(
+            (a + 2 * b * c) - (b * t_series[t_series >= c])
+        )
 
     def get_y_series(self):
         """Note: logical indexing is the best way to implement piecewise funtions to pd.Series i could find."""
-        return (
-            self.parameters.a + self.t_series[self.t_series < self.parameters.c] * self.parameters.b
-        ).append(
-            (self.parameters.a + 2 * self.parameters.b * self.parameters.c)
-            - (self.parameters.b * self.t_series[self.t_series >= self.parameters.c])
+        return self.triangular(
+            self.t_series, self.parameters.a, self.parameters.b, self.parameters.c
         )
 
     def get_feature_vector(self):
@@ -239,33 +253,36 @@ class TrapezoidalStructure(Structure):
         t_series = time_series['t']
         y_series = time_series['y']
 
-        def minimized_function(params):
-            parameters = TrapezoidalParameters(*params)
-            structure = TrapezoidalStructure(parameters, t_series)
-            struct_y_series = structure.get_y_series()
-            return sum((y_series - struct_y_series) ** 2)
+        params, cov = curve_fit(
+            cls.trapezoidal,
+            t_series,
+            y_series,
+            p0=(y_series.mean(), (y_series.max() - y_series.mean()), 0),
+            bounds=(
+                [-np.inf, -np.inf, 0],
+                [np.inf, np.inf, (t_series.max() - t_series.min()) / t_series.std()],
+            ),
+            maxfev=2000,
+        )
 
-        x0 = np.array([0, 0, 0])
-        res = minimize(minimized_function, x0, method='Nelder-Mead')
-        return TrapezoidalParameters(*res.x)
+        return TrapezoidalParameters(*params)
+
+    @staticmethod
+    def trapezoidal(t_series, a, b, c):
+        t_series = (t_series - t_series.min()) / t_series.std()
+        t2 = t_series.max()
+        t1 = t_series.min()
+        c_start = t1 + (c - t1) / 2
+        c_stop = t1 + t2 - c_start
+        return (
+            (a + t_series[t_series < c_start] * b).append(
+                (a + b * c_start) + t_series[(c_start <= t_series) & (t_series < c_stop)] * 0
+            )
+        ).append((a + b * c_start + b * c_stop - t_series[t_series >= c_stop] * b))
 
     def get_y_series(self):
-        # Note the & usage in middle part. Pandas needs this instead of python simple 'and'
-        n = self.t_series.max()
-        c_start = (n - self.parameters.c) / 2
-        c_stop = n - c_start + 1
-        return (
-            (self.parameters.a + self.t_series[self.t_series < c_start] * self.parameters.b).append(
-                (self.parameters.a + self.parameters.b * c_start)
-                + self.t_series[(c_start <= self.t_series) & (self.t_series < c_stop)] * 0
-            )
-        ).append(
-            (
-                self.parameters.a
-                + self.parameters.b * c_start
-                + self.parameters.b * c_stop
-                - self.t_series[self.t_series >= c_stop] * self.parameters.b
-            )
+        return self.trapezoidal(
+            self.t_series, self.parameters.a, self.parameters.b, self.parameters.c
         )
 
     def get_feature_vector(self):
