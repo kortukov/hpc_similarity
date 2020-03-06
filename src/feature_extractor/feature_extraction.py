@@ -30,9 +30,11 @@ def detect_optimal_structure(time_series):
     return min_structure
 
 
-def detect_superstructure(time_series, partitioning=None, change_points=None):
+def detect_superstructure(time_series, partitioning=None, change_points=None, time_delta=None):
     superstructure = SuperstructureApproximation()
-    superstructure.partitioning = partitioning or get_partitioning(time_series, change_points)
+    superstructure.partitioning = partitioning or get_partitioning(
+        time_series, change_points, time_delta
+    )
     for left, right in superstructure.partitioning:
         subregion = time_series[left:right]
         subregion_structure = detect_optimal_structure(subregion)
@@ -42,10 +44,10 @@ def detect_superstructure(time_series, partitioning=None, change_points=None):
     return superstructure
 
 
-def get_partitioning(time_series, change_points=None):
+def get_partitioning(time_series, change_points=None, time_delta=None):
     if not change_points:
         change_points, change_points_times = change_point_detection.detect_change_points(
-            [time_series]
+            [time_series], time_delta
         )
     return [(change_points[i], change_points[i + 1]) for i in range(len(change_points) - 1)]
 
