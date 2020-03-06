@@ -10,6 +10,7 @@ SinusoidalParameters = namedtuple('SinusoidalParameters', 'a b c')
 TriangularParameters = namedtuple('TriangularParameters', 'a b c')
 TrapezoidalParameters = namedtuple('TrapezoidalParameters', 'a b c')
 ZFormParameters = namedtuple('ZFormParameters', 'a b c_start c_stop')
+InverseZFormParameters = namedtuple('InverseZFormParameters', 'a b c_start c_stop')
 
 DISPLAY_SEARCH = True
 
@@ -370,8 +371,6 @@ class ZFormStructure(Structure):
     @staticmethod
     def z_form(t_series, a, b, c_start, c_stop):
         t_series = (t_series - t_series.min()) / t_series.std()
-        t2 = t_series.max()
-        t1 = t_series.min()
         return (
             ((a + b * c_start) + t_series[t_series < c_start] * 0).append(
                 (a + b * t_series[(c_start <= t_series) & (t_series < c_stop)])
@@ -380,6 +379,73 @@ class ZFormStructure(Structure):
 
     def get_y_series(self):
         return self.z_form(
+            self.t_series,
+            self.parameters.a,
+            self.parameters.b,
+            self.parameters.c_start,
+            self.parameters.c_stop,
+        )
+
+    @property
+    def symbol(self):
+        if -0.001 < self.parameters.b < 0.001:
+            return 'a'
+        if self.parameters.b < 0:
+            return 'k'
+        else:
+            return 'l'
+
+
+class InverseZFormStructure(Structure):
+    """ f(t) =
+        a + b*t if t < c_start
+        a + b*c_start if  c_start <= t <c_stop
+        (a + b*c_start +b*c_stop)+(b*t) if t >= c_stop
+    """
+
+    @classmethod
+    def _compute_parameters(cls, time_series):
+        t_series = time_series['t']
+        y_series = time_series['y']
+
+        if len(y_series) < 3:
+            return InverseZFormParameters(y_series.mean(), 0, t_series.mean())
+
+        params, cov = curve_fit(
+            cls.inverse_z_form,
+            t_series,
+            y_series,
+            p0=(
+                y_series.mean(),
+                (y_series.max() - y_series.mean()),
+                0,
+                (t_series.max() - t_series.min()) / t_series.std(),
+            ),
+            bounds=(
+                [-np.inf, -np.inf, 0, ((t_series.max() - t_series.min()) / t_series.std()) / 2],
+                [
+                    np.inf,
+                    np.inf,
+                    ((t_series.max() - t_series.min()) / t_series.std()) / 2,
+                    ((t_series.max() - t_series.min()) / t_series.std()),
+                ],
+            ),
+            maxfev=2000,
+        )
+
+        return InverseZFormParameters(*params)
+
+    @staticmethod
+    def inverse_z_form(t_series, a, b, c_start, c_stop):
+        t_series = (t_series - t_series.min()) / t_series.std()
+        return (
+            (a + t_series[t_series < c_start] * b).append(
+                (a + b * c_start) + t_series[(c_start <= t_series) & (t_series < c_stop)] * 0
+            )
+        ).append((a + b * c_start - b * c_stop + b * t_series[t_series >= c_stop]))
+
+    def get_y_series(self):
+        return self.inverse_z_form(
             self.t_series,
             self.parameters.a,
             self.parameters.b,
@@ -399,9 +465,9 @@ class ZFormStructure(Structure):
         if -0.001 < self.parameters.b < 0.001:
             return 'a'
         if self.parameters.b < 0:
-            return 'k'
+            return 'm'
         else:
-            return 'l'
+            return 'n'
 
 
 AllStructures = (
@@ -412,4 +478,5 @@ AllStructures = (
     TriangularStructure,
     TrapezoidalStructure,
     ZFormStructure,
+    InverseZFormStructure,
 )
