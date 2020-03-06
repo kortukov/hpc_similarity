@@ -9,6 +9,7 @@ ExponentialParameters = namedtuple('ExponentialParameters', 'a b c')
 SinusoidalParameters = namedtuple('SinusoidalParameters', 'a b c')
 TriangularParameters = namedtuple('TriangularParameters', 'a b c')
 TrapezoidalParameters = namedtuple('TrapezoidalParameters', 'a b c')
+ZFormParameters = namedtuple('ZFormParameters', 'a b c_start c_stop')
 
 DISPLAY_SEARCH = True
 
@@ -129,9 +130,19 @@ class ExponentialStructure(Structure):
         t_series = time_series['t']
         y_series = time_series['y']
 
-        params, cov = curve_fit(
-            cls.exponential, t_series, y_series, p0=(1, 2, y_series.mean()), maxfev=2000
-        )
+        if len(y_series) < 3:
+            return ExponentialParameters(0, 0, y_series.mean())
+        try:
+            params, cov = curve_fit(
+                cls.exponential, t_series, y_series, p0=(1, 2, y_series.mean()), maxfev=3000
+            )
+        except RuntimeError:
+            try:
+                params, cov = curve_fit(
+                    cls.exponential, t_series, y_series, p0=(-1, 2, y_series.mean()), maxfev=6000
+                )
+            except RuntimeError:
+                return ExponentialParameters(0, 0, y_series.mean())
         return ExponentialParameters(*params)
 
     @staticmethod
@@ -153,6 +164,15 @@ class ExponentialStructure(Structure):
 
     @property
     def symbol(self):
+        if self.parameters.a == 0 or self.parameters.b == 0:
+            # as const
+            return 'a'
+        if 0.98 < self.parameters.b < 1.02:
+            # as straight
+            if self.parameters.a < 0:
+                return 'b'
+            else:
+                return 'c'
         if -1 < self.parameters.b < 1:
             return 'd'
         else:
@@ -174,9 +194,7 @@ class SinusoidalStructure(Structure):
             return sum((y_series - struct_y_series) ** 2)
 
         x0 = np.array([0, 0, 0])
-        res = minimize(
-            minimized_function, x0, method='Nelder-Mead', options={'disp': DISPLAY_SEARCH}
-        )
+        res = minimize(minimized_function, x0, method='Nelder-Mead')
         return SinusoidalParameters(*res.x)
 
     def get_y_series(self):
@@ -204,6 +222,9 @@ class TriangularStructure(Structure):
     def _compute_parameters(cls, time_series):
         t_series = time_series['t']
         y_series = time_series['y']
+
+        if len(y_series) < 3:
+            return TriangularParameters(y_series.mean(), 0, t_series.mean())
 
         params, cov = curve_fit(
             cls.triangular,
@@ -235,6 +256,8 @@ class TriangularStructure(Structure):
 
     @property
     def symbol(self):
+        if -0.001 < self.parameters.b < 0.001:
+            return 'a'
         if self.parameters.b < 0:
             return 'g'
         else:
@@ -252,6 +275,9 @@ class TrapezoidalStructure(Structure):
     def _compute_parameters(cls, time_series):
         t_series = time_series['t']
         y_series = time_series['y']
+
+        if len(y_series) < 3:
+            return TrapezoidalParameters(y_series.mean(), 0, t_series.mean())
 
         params, cov = curve_fit(
             cls.trapezoidal,
@@ -294,10 +320,88 @@ class TrapezoidalStructure(Structure):
 
     @property
     def symbol(self):
+        if -0.001 < self.parameters.b < 0.001:
+            return 'a'
         if self.parameters.b < 0:
             return 'i'
         else:
             return 'j'
+
+
+class ZFormStructure(Structure):
+    """ f(t) =
+        a + b*c_start if t < c_start
+        a + b*t if c_start <= t < c_stop
+        a + b*c_stop if t >= c_stop
+    """
+
+    @classmethod
+    def _compute_parameters(cls, time_series):
+        t_series = time_series['t']
+        y_series = time_series['y']
+
+        if len(y_series) < 3:
+            return ZFormParameters(y_series.mean(), 0, t_series.mean())
+
+        params, cov = curve_fit(
+            cls.z_form,
+            t_series,
+            y_series,
+            p0=(
+                y_series.mean(),
+                y_series.mean(),
+                0,
+                (t_series.max() - t_series.min()) / t_series.std(),
+            ),
+            bounds=(
+                [-np.inf, -np.inf, 0, ((t_series.max() - t_series.min()) / t_series.std()) / 2],
+                [
+                    np.inf,
+                    np.inf,
+                    ((t_series.max() - t_series.min()) / t_series.std()) / 2,
+                    ((t_series.max() - t_series.min()) / t_series.std()),
+                ],
+            ),
+            maxfev=2000,
+        )
+
+        return ZFormParameters(*params)
+
+    @staticmethod
+    def z_form(t_series, a, b, c_start, c_stop):
+        t_series = (t_series - t_series.min()) / t_series.std()
+        t2 = t_series.max()
+        t1 = t_series.min()
+        return (
+            ((a + b * c_start) + t_series[t_series < c_start] * 0).append(
+                (a + b * t_series[(c_start <= t_series) & (t_series < c_stop)])
+            )
+        ).append(((a + b * c_stop) + t_series[t_series > c_stop] * 0))
+
+    def get_y_series(self):
+        return self.z_form(
+            self.t_series,
+            self.parameters.a,
+            self.parameters.b,
+            self.parameters.c_start,
+            self.parameters.c_stop,
+        )
+
+    def get_feature_vector(self):
+        feature_vector = [0.0] * 15
+        feature_vector[12] = self.parameters.a
+        feature_vector[13] = self.parameters.b
+        feature_vector[14] = self.parameters.c_start
+        return np.array(feature_vector)
+
+    @property
+    def symbol(self):
+        if -0.001 < self.parameters.b < 0.001:
+            return 'a'
+        if self.parameters.b < 0:
+            return 'k'
+        else:
+            return 'l'
 
 
 AllStructures = (
@@ -307,4 +411,5 @@ AllStructures = (
     SinusoidalStructure,
     TriangularStructure,
     TrapezoidalStructure,
+    ZFormStructure,
 )
