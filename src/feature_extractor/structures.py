@@ -15,6 +15,24 @@ InverseZFormParameters = namedtuple('InverseZFormParameters', 'a b c_start c_sto
 DISPLAY_SEARCH = True
 
 
+alternative_encoding_map = {
+    'a': 'a',
+    'b': 'b',
+    'c': 'c',
+    'd': 'd',
+    'e': 'e',
+    'f': 'f',
+    'g': 'bc',
+    'h': 'cb',
+    'i': 'bac',
+    'j': 'cab',
+    'k': 'aba',
+    'l': 'aca',
+    'm': 'bab',
+    'n': 'cac',
+}
+
+
 class Structure:
     """Base class for all 6 structures
     Args:
@@ -64,6 +82,10 @@ class Structure:
     @property
     def symbol(self):
         raise NotImplementedError
+
+    @property
+    def alternative_symbol(self):
+        return alternative_encoding_map[self.symbol]
 
     def __repr__(self):
         return str(type(self))
@@ -135,12 +157,12 @@ class ExponentialStructure(Structure):
             return ExponentialParameters(0, 0, y_series.mean())
         try:
             params, cov = curve_fit(
-                cls.exponential, t_series, y_series, p0=(1, 2, y_series.mean()), maxfev=3000
+                cls.exponential, t_series, y_series, p0=(1, 2, y_series.mean()), maxfev=2000
             )
         except RuntimeError:
             try:
                 params, cov = curve_fit(
-                    cls.exponential, t_series, y_series, p0=(-1, 2, y_series.mean()), maxfev=6000
+                    cls.exponential, t_series, y_series, p0=(-1, 2, y_series.mean()), maxfev=4000
                 )
             except RuntimeError:
                 return ExponentialParameters(0, 0, y_series.mean())
@@ -210,6 +232,9 @@ class SinusoidalStructure(Structure):
 
     @property
     def symbol(self):
+        if self.parameters.a == 0:
+            # as const
+            return 'a'
         return 'f'
 
 
@@ -227,13 +252,28 @@ class TriangularStructure(Structure):
         if len(y_series) < 3:
             return TriangularParameters(y_series.mean(), 0, t_series.mean())
 
-        params, cov = curve_fit(
-            cls.triangular,
-            t_series,
-            y_series,
-            p0=(y_series.mean(), y_series.mean() / (t_series.mean() or 1), t_series.mean()),
-            bounds=([-np.inf, -np.inf, t_series.min()], [np.inf, np.inf, t_series.max()]),
-        )
+        try:
+            params, cov = curve_fit(
+                cls.triangular,
+                t_series,
+                y_series,
+                p0=(y_series.mean(), y_series.mean() / (t_series.mean() or 1), t_series.mean()),
+                bounds=([-np.inf, -np.inf, t_series.min()], [np.inf, np.inf, t_series.max()]),
+                maxfev=1000,
+            )
+        except RuntimeError:
+            try:
+                params, cov = curve_fit(
+                    cls.triangular,
+                    t_series,
+                    y_series,
+                    p0=(y_series.mean(), y_series.mean() / (t_series.mean() or 1), t_series.mean()),
+                    bounds=([-np.inf, -np.inf, t_series.min()], [np.inf, np.inf, t_series.max()]),
+                    maxfev=2000,
+                )
+            except RuntimeError:
+                return TriangularParameters(y_series.mean(), 0, t_series.mean())
+
         return TriangularParameters(*params)
 
     @staticmethod
@@ -258,6 +298,7 @@ class TriangularStructure(Structure):
     @property
     def symbol(self):
         if -0.001 < self.parameters.b < 0.001:
+            # as const
             return 'a'
         if self.parameters.b < 0:
             return 'g'
@@ -279,18 +320,33 @@ class TrapezoidalStructure(Structure):
 
         if len(y_series) < 3:
             return TrapezoidalParameters(y_series.mean(), 0, t_series.mean())
-
-        params, cov = curve_fit(
-            cls.trapezoidal,
-            t_series,
-            y_series,
-            p0=(y_series.mean(), (y_series.max() - y_series.mean()), 0),
-            bounds=(
-                [-np.inf, -np.inf, 0],
-                [np.inf, np.inf, (t_series.max() - t_series.min()) / t_series.std()],
-            ),
-            maxfev=2000,
-        )
+        try:
+            params, cov = curve_fit(
+                cls.trapezoidal,
+                t_series,
+                y_series,
+                p0=(y_series.mean(), (y_series.max() - y_series.mean()), 0),
+                bounds=(
+                    [-np.inf, -np.inf, 0],
+                    [np.inf, np.inf, (t_series.max() - t_series.min()) / t_series.std()],
+                ),
+                maxfev=2000,
+            )
+        except RuntimeError:
+            try:
+                params, cov = curve_fit(
+                    cls.trapezoidal,
+                    t_series,
+                    y_series,
+                    p0=(y_series.mean(), (y_series.max() - y_series.mean()), 0),
+                    bounds=(
+                        [-np.inf, -np.inf, 0],
+                        [np.inf, np.inf, (t_series.max() - t_series.min()) / t_series.std()],
+                    ),
+                    maxfev=4000,
+                )
+            except RuntimeError:
+                return TrapezoidalParameters(y_series.mean(), 0, t_series.mean())
 
         return TrapezoidalParameters(*params)
 
@@ -342,29 +398,32 @@ class ZFormStructure(Structure):
         y_series = time_series['y']
 
         if len(y_series) < 3:
-            return ZFormParameters(y_series.mean(), 0, t_series.mean())
+            return ZFormParameters(y_series.mean(), 0, t_series.mean(), t_series.mean())
 
-        params, cov = curve_fit(
-            cls.z_form,
-            t_series,
-            y_series,
-            p0=(
-                y_series.mean(),
-                y_series.mean(),
-                0,
-                (t_series.max() - t_series.min()) / t_series.std(),
-            ),
-            bounds=(
-                [-np.inf, -np.inf, 0, ((t_series.max() - t_series.min()) / t_series.std()) / 2],
-                [
-                    np.inf,
-                    np.inf,
-                    ((t_series.max() - t_series.min()) / t_series.std()) / 2,
-                    ((t_series.max() - t_series.min()) / t_series.std()),
-                ],
-            ),
-            maxfev=2000,
-        )
+        try:
+            params, cov = curve_fit(
+                cls.z_form,
+                t_series,
+                y_series,
+                p0=(
+                    y_series.mean(),
+                    y_series.mean(),
+                    0,
+                    (t_series.max() - t_series.min()) / t_series.std(),
+                ),
+                bounds=(
+                    [-np.inf, -np.inf, 0, ((t_series.max() - t_series.min()) / t_series.std()) / 2],
+                    [
+                        np.inf,
+                        np.inf,
+                        ((t_series.max() - t_series.min()) / t_series.std()) / 2,
+                        ((t_series.max() - t_series.min()) / t_series.std()),
+                    ],
+                ),
+                maxfev=2000,
+            )
+        except RuntimeError:
+            return ZFormParameters(y_series.mean(), 0, t_series.mean(), t_series.mean())
 
         return ZFormParameters(*params)
 
@@ -409,29 +468,31 @@ class InverseZFormStructure(Structure):
         y_series = time_series['y']
 
         if len(y_series) < 3:
-            return InverseZFormParameters(y_series.mean(), 0, t_series.mean())
-
-        params, cov = curve_fit(
-            cls.inverse_z_form,
-            t_series,
-            y_series,
-            p0=(
-                y_series.mean(),
-                (y_series.max() - y_series.mean()),
-                0,
-                (t_series.max() - t_series.min()) / t_series.std(),
-            ),
-            bounds=(
-                [-np.inf, -np.inf, 0, ((t_series.max() - t_series.min()) / t_series.std()) / 2],
-                [
-                    np.inf,
-                    np.inf,
-                    ((t_series.max() - t_series.min()) / t_series.std()) / 2,
-                    ((t_series.max() - t_series.min()) / t_series.std()),
-                ],
-            ),
-            maxfev=2000,
-        )
+            return InverseZFormParameters(y_series.mean(), 0, t_series.mean(), t_series.mean())
+        try:
+            params, cov = curve_fit(
+                cls.inverse_z_form,
+                t_series,
+                y_series,
+                p0=(
+                    y_series.mean(),
+                    (y_series.max() - y_series.mean()),
+                    0,
+                    (t_series.max() - t_series.min()) / t_series.std(),
+                ),
+                bounds=(
+                    [-np.inf, -np.inf, 0, ((t_series.max() - t_series.min()) / t_series.std()) / 2],
+                    [
+                        np.inf,
+                        np.inf,
+                        ((t_series.max() - t_series.min()) / t_series.std()) / 2,
+                        ((t_series.max() - t_series.min()) / t_series.std()),
+                    ],
+                ),
+                maxfev=2000,
+            )
+        except RuntimeError:
+            return InverseZFormParameters(y_series.mean(), 0, t_series.mean(), t_series.mean())
 
         return InverseZFormParameters(*params)
 
