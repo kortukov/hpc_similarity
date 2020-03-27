@@ -14,7 +14,7 @@ def detect_change_points(time_series_dict, time_delta):
         last index in time-series. Second element is timestamps of changepoints, for plotting.
 
     """
-    min_size = int(30 / time_delta) + 1
+    min_size = int(30 / time_delta) + 2
 
     multivariate_ts = np.stack([np.array(ts.y) for ts in time_series_dict.values()])
     multivariate_ts = multivariate_ts.transpose()

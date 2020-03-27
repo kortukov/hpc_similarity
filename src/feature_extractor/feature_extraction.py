@@ -18,6 +18,9 @@ class SuperstructureApproximation:
     def get_string(self):
         return ''.join([structure.symbol for structure in self.structures])
 
+    def get_alternative_string(self):
+        return ''.join([structure.alternative_symbol for structure in self.structures])
+
 
 def detect_optimal_structure(time_series):
     min_error = float('inf')
@@ -35,7 +38,8 @@ def detect_superstructure(time_series, partitioning=None, change_points=None, ti
     superstructure.partitioning = partitioning or get_partitioning(
         time_series, change_points, time_delta
     )
-    for left, right in superstructure.partitioning:
+    for index, (left, right) in enumerate(superstructure.partitioning):
+        # print('Detecting region number {} left {} right {}'.format(index, left, right))
         subregion = time_series[left:right]
         subregion_structure = detect_optimal_structure(subregion)
         superstructure.structures.append(subregion_structure)

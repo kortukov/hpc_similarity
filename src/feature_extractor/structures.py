@@ -259,20 +259,10 @@ class TriangularStructure(Structure):
                 y_series,
                 p0=(y_series.mean(), y_series.mean() / (t_series.mean() or 1), t_series.mean()),
                 bounds=([-np.inf, -np.inf, t_series.min()], [np.inf, np.inf, t_series.max()]),
-                maxfev=1000,
+                maxfev=1200,
             )
         except RuntimeError:
-            try:
-                params, cov = curve_fit(
-                    cls.triangular,
-                    t_series,
-                    y_series,
-                    p0=(y_series.mean(), y_series.mean() / (t_series.mean() or 1), t_series.mean()),
-                    bounds=([-np.inf, -np.inf, t_series.min()], [np.inf, np.inf, t_series.max()]),
-                    maxfev=2000,
-                )
-            except RuntimeError:
-                return TriangularParameters(y_series.mean(), 0, t_series.mean())
+            return TriangularParameters(y_series.mean(), 0, t_series.mean())
 
         return TriangularParameters(*params)
 
@@ -333,20 +323,7 @@ class TrapezoidalStructure(Structure):
                 maxfev=2000,
             )
         except RuntimeError:
-            try:
-                params, cov = curve_fit(
-                    cls.trapezoidal,
-                    t_series,
-                    y_series,
-                    p0=(y_series.mean(), (y_series.max() - y_series.mean()), 0),
-                    bounds=(
-                        [-np.inf, -np.inf, 0],
-                        [np.inf, np.inf, (t_series.max() - t_series.min()) / t_series.std()],
-                    ),
-                    maxfev=4000,
-                )
-            except RuntimeError:
-                return TrapezoidalParameters(y_series.mean(), 0, t_series.mean())
+            return TrapezoidalParameters(y_series.mean(), 0, t_series.mean())
 
         return TrapezoidalParameters(*params)
 
